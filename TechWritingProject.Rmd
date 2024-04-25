@@ -1,0 +1,463 @@
+---
+title: "EDA Code Notebook"
+author: "Camilla Yoon, Sara Perez, Vedika Goyal"
+date: '2024-03-17'
+output:
+  pdf_document:
+    toc: true
+  html_document:
+    toc: true
+    toc_float: true
+---
+
+```{r setup, include=FALSE}
+library(ggplot2)
+library(dplyr)
+library(broom)
+library(MASS)
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction
+
+The dataset for our literate analysis comes from the Monitoring the Future (MTF) Project, a comprehensive and ongoing research initiative conducted by the University of Michigan’s Insitute for Social Research. The project was executed under Richard Miech's and his team's guidance, including Lloyd D. Johnston, Jerald G. Bahman, Patrick M. O’Malley, John Schuldenber, and Megan Patrick. Their research is distinctly relevant for its annual surveys that provide a broad and detailed exploration of American adolescents' most recent behaviors, values, and lifestyles. The MTF Project’s dataset incorporates a wide range of data, including approximately 1,400 questions each year, guaranteeing the sample sizes are large, nationally representative, and capable of distinguishing significant trends and changes over time.
+
+Our analysis draws upon the MTF Project’s dataset, focusing on the 2022 survey of 12th-grade students, to explore how family background and educational aspirations influence substance use behaviors. This research question is particularly relevant given the evolving environment of youth culture and the direct impact of familial and academic environments on teenagers’ decision-making and health outcomes. By analyzing these variables, we aim to contribute to understanding preventive factors and risk behaviors, providing valuable insights that can inform policies and interventions directed at reducing adolescent substance use. Our research works on extending the goals of the MFT Project, offering further explanations for observed trends and behaviors while also aligning with the broader objective of addressing the challenges faced by America’s youth.
+
+## Initializing the Analysis: Loading and Preliminary Exploration of the MTF Dataset
+
+We begin by loading the necessary library, ggplot2, to get an overview of all variables in the dataset for data visualization. The dataset is loaded from a file (form2.rda), and a summary of its variables is displayed to provide an initial overview.
+
+### 1. Loading the dataset
+
+```{r load}
+#import raw data set ==> form 2 of Monitoring the Future Data
+load(file='form2.rda')
+data <- da38882.0003 
+```
+
+### 2.Data restructuring and filtering
+
+We proceed to structure the data by selecting variables of interest related to family background, educational aspirations, and substance use.
+
+```{r}
+#'V' variable represents:
+# V2155 - Father (or male gaurdian) present - (1:yes), (0:no)
+# V2156 - Mother (or female gaurdian) present - (1:yes), (0:no)
+# V2163 - Father education level -  (1="Completed grade school or less", 2="Some high school", 3="Completed high school", 4="Some college", 5="Completed college", 6="Graduate or professional school after college", 7="Don't know, or does not apply")
+# V2164 - Mother education level - (1="Completed grade school or less", 2="Some high school", 3="Completed high school", 4="Some college", 5="Completed college", 6="Graduate or professional school after college", 7="Don't know, or does not apply")
+# V2101 - Have you ever smoked cigarettes? - (1="Never", 2="Once or twice", 3="Occasionally but not regularly", 4="Regularly in the past", 5="Regularly now")
+# V2105 - On how many occasions (if any) have you had alcoholic beverages to drink--more than just a few sips . . . during the last 12 months? - (1="0 Occasions", 2="1-2 Occasions", 3="3-5 Occasions", 4="6-9 Occasions", 5="10-19 Occasions", 6="20-39 Occasions", 7="40 or More")
+
+selected_vars <- data[c("V2155", "V2156", "V2163", "V2164", "V2101", "V2105")] 
+summary(selected_vars)
+```
+
+Subsequently, a new dataframe (dfData) is created, containing the selected variables.
+
+```{r restrfiltr}
+####FAMILY BACKGROUND VAR
+fatherPresent <- data$V2155
+motherPresent <- data$V2156
+fatherEdu <- data$V2163
+motherEdu <- data$V2164
+
+
+###SUBSTANCE USE VAR
+#Have you ever smoked cigarettes?
+smokeCig <- data$V2101
+#On how many occasions (if any) have you had alcoholic beverages to drink--more than just a few sips . . . during the last 12 months?
+drinkYr <- data$V2105
+
+#create new dataframe with the variables we are interested in
+dfData <- data.frame(data$RESPONDENT_ID, 
+                          fatherPresent,
+                          motherPresent,
+                          fatherEdu,
+                          motherEdu,
+                          smokeCig,
+                          drinkYr)
+```
+
+### 3. Cleaning the data
+
+A summary of the new dataframe reveals the presence of missing values (NA). To address this, we perform a cleaning step, creating a new dataframe (dfData_noNA) by excluding rows with any missing data.
+
+```{r cleaning}
+summary(dfData) #overview of variables... notice NA values
+
+####CLEANING STEP
+#Remove NA values
+dfData_noNA <- na.omit(dfData) #exclude rows that have missing data in any variable
+summary(dfData_noNA) #overview of variables and check that there are no more na values
+
+```
+
+## Visual Insights: Graphical Representation of Data Trends and Relationships
+
+Next, we will further familiarize ourselves with the specific variables we are interested in. We can accomplish this by creating bar graphs and obtaining proportions for binary variables.
+
+### Father Presence
+
+Initially, the study starts with a distribution map of the binary variable "Father Presence." Two columns are created by the code:'scale' for the binary categories ('No' and 'Yes') and 'count' for the corresponding frequencies. The resulting data frame is called dfFatherPresent. To do this, the fatherPresent variable from the dataset dfData_noNA is summarized. Next, ggplot2 is used to create a bar graph (plotFatherPresent) that shows the distribution of this binary variable graphically. Furthermore, the binary variable's mean—which indicates the percentage of respondents who report having a father in their home—is computed. This percentage is calculated as follows: 954 (the number of respondents who reported having a father present) divided by the total number of respondents for whom data were available (954 + 392) yields around 0.7088, or 70.88%.
+
+This suggests that a father figure resides in the families of the majority of the assessed respondents. An increased percentage of dads in attendance indicates that paternal influence is common in the households in the sample. Fathers' presence in a home may affect a family's dynamics in a number of ways, including their responsibilities in raising children, providing financial support, and maintaining emotional stability. Higher percentages might be a sign of more active fatherhood, which can lead to better results including improved academic achievement, socioemotional growth, and general family well-being.
+
+```{r fatherP}
+#FATHER PRESENCE
+#create dataframe
+dfFatherPresent <- data.frame(scale = c('No','Yes'), count = summary(dfData_noNA$fatherPresent))
+#bar graph to visualize distribution of binary variable
+plotFatherPresent<-ggplot(data=dfFatherPresent, aes(x=scale, y=count)) +
+  geom_bar(stat="identity") + labs(title = 'Father Presence', x = "Respondent's Household Father Present", y = 'Count')
+plotFatherPresent
+#calculate mean of binary variable which is the proportion of respondents who have household father present
+summary(dfData_noNA$fatherPresent)
+propWithFatherPresent <- 954/(954+392)
+print(propWithFatherPresent)
+```
+
+### Mother Presence
+
+Following the analysis of father presence, the code proceeds to examine the presence of mothers in respondents' households. The counts of respondents with and without a mother present are kept in a dataframe called dfMotherPresent. The motherPresent field from the dataset dfData_noNA is tabulated in order to do this. Two columns make up the resultant dataframe: 'count' for the corresponding frequencies and'response' for the binary categories ('(0) NT MARKD:(0)' and '(1) MARKED:(1)'). ggplot2 is used to create a bar graph that shows the distribution of this binary variable. Furthermore, the percentage of respondents who reported having a mother present is computed as follows: 1199 (the number of respondents who reported having a mother present) divided by the total number of respondents for whom data is available (1199 + 147), yielding an estimated result of 0.8908 or 89.08%.
+
+This indicates that a vast majority of the people who participated in the poll have a mother figure living with them. A larger percentage of moms in attendance suggests that mothers have a major effect on the families in the sample. Within the family, a mother's presence is essential for nurturing, providing care, and offering emotional support. It's frequently linked to qualities like emotional intelligence, emotional kindness, and home management. Positive outcomes for kids, such as improved social-emotional growth, academic success, and general family harmony, can be attributed to a strong mother presence.
+
+```{r motherP}
+#MOTHER PRESENCE
+dfMotherPresent <- as.data.frame(table(dfData_noNA$motherPresent))
+dfMotherPresent
+colnames(dfMotherPresent) <- c("response", "count")
+ggplot(dfMotherPresent, aes(x = response, y = count)) +
+  geom_bar(stat = "identity") +
+  theme_minimal() +
+  labs(title = "Mother Present in Household", x = "Response", y = "Count")
+propWithMotherPresent <- 1199/(1199+147)
+propWithMotherPresent
+```
+
+```{r}
+# Mosaic Plot for Parental Presence
+ggplot(dfData_noNA, aes(x=factor(motherPresent), fill=factor(fatherPresent))) +
+  geom_bar(position="fill") +
+  coord_flip() +
+  labs(x="Mother Present", y="Proportion", fill="Father Present")
+
+```
+
+### Father's Education
+
+Further, to explore the impact of family background on substance use behavior and educational aspirations among 12th-grade students, we focused on the variable representing the father’s educational level. This particular variable was categorized into separate categories: high school graduation, college graduation, graduate school, and other educational achievements. Still using the ‘tidyverse’ suite, we started by summarizing the variable to understand its distribution within our data set. Then, using ‘ggplot2’, we visualized these categories more precisely and concisely by creating a histogram to observe the prevalence of each educational level among the respondents’ fathers.
+
+The analysis of education aims to discover a potential correlation between the educational background of the father and the student’s educational ambitions and, subsequently, substance use behavior. For instance, we theorize that higher educational accomplishments by the father may be associated with higher aspirations and lower substance use among the respondents. Our analysis resulted in a bimodal histogram in which the father’s educational background peaked for the high school and college graduate categories. From this graphical representation, it is evident that the most common educational levels fall within the categories of some college, college graduate, and graduate school, as these categories show higher counts in comparison to the other educational levels.
+
+By breaking down the data set in this manner, we obtained a more nuanced understanding of the role that a father’s education can play in shaping the environment in which teenagers make decisions regarding substance use and education. This understanding sets a foundation to further explore the parental behavior of the respondents and find a potential correlation between such. The insights derived from our histogram analysis highlight the importance of parental educational achievements in shaping the experiences of adolescents. This data is crucial for educators to tailor support systems that consider the nuanced dynamics of family background in student development.
+
+```{r fatherEdu}
+# Convert the table to a data frame for ggplot
+dfFatherEdu <- as.data.frame(table(dfData_noNA$fatherEdu))
+# Rename columns to make them more descriptive
+colnames(dfFatherEdu) <- c("levelEducation", "count")
+# Create the bar graph
+ggplot(dfFatherEdu, aes(x = levelEducation, y = count)) +
+  geom_bar(stat = "identity") +
+  theme_minimal() +
+  labs(title = "Father's Level of Education", x = "Level of Education", y = "Count")
+
+```
+
+### Mother's Education
+
+Following the exploration of the father’s educational background, we extended our analysis to the mother’s educational levels, another crucial factor influencing adolescent behaviors and aspirations. Similar to the approach detailed for father’s education, the categorized the mothers’ education into separate categories, also ranging from high school completion to advanced degrees. With this segmentation, we strived to identify patterns in the dataset that may reveal the influence of a mother’s educational achievements and the respondents' behavior.
+
+Further, using ‘tidyverse’ and ‘ggplot2’, we summarized and visualized these categories as a histogram, focusing on the distribution across the survey respondents. Contrary to the distribution of fathers’ level of education, we obtained an unimodal histogram in which most of the respondents’ mothers had undergraduate degrees in college thus indicating that the highest number of respondents have mothers with a college education and, potentially, reflecting on the students’ own educational aspirations and lifestyle choices. Notably, the lower count in the ‘Don’t Know’ category implies a general awareness among the respondents’ maternal educational levels, which could point to the involvement and/or influence of their educational status in the students’ lives.
+
+We hypothesize that maternal education could significantly predict positive educational outcomes and reduce risk behaviors in adolescents, emphasizing the role of maternal influence in the social and academic development of the youth.
+
+```{r motherEdu}
+# Convert the table to a data frame for ggplot
+dfMotherEdu <- as.data.frame(table(dfData_noNA$motherEdu))
+dfMotherEdu
+# Rename columns to make them more descriptive
+colnames(dfMotherEdu) <- c("levelEducation", "count")
+# Create the bar graph
+ggplot(dfMotherEdu, aes(x = levelEducation, y = count)) +
+  geom_bar(stat = "identity") +
+  theme_minimal() +
+  labs(title = "Mother's Level of Education", x = "Level of Education", y = "Count")
+
+```
+
+### Cigarettes
+
+This component of the study focuses on comprehending the smoking behaviors of the respondents to the survey. 'Never', '1-2 times', 'Occasionally', 'Regularly in Past', and 'Regularly Now' are the answers on a scale of replies we define for inquiries on cigarette smoking, organized from least to most frequent. The arranged scale offers a methodical structure for classifying the smoking habits of participants, facilitating more lucid interpretation and examination. Next, in order to record the number of responders for each category of smoking behavior, we establish a dataframe called dfSmokeCig. The dataframe dfSmokeCig that is produced has two columns:'scale' which indicates the categories of smoking habit, and 'count' which indicates the frequency of respondents falling into each category.
+
+To visually represent the distribution of smoking behaviors, we generate a bar graph (plotSmokeCig) using the ggplot2 library. This graph plots the counts of respondents for each smoking behavior category on the y-axis against the ordered smoking behavior scale on the x-axis. The resulting visualization provides a clear depiction of the frequency of cigarette smoking among respondents, ranging from 'Never' to 'Regularly Now'.
+
+Analyzing respondents' smoking habits shows intriguing trends in the replies' distribution. There are 1118 responses in the 'Never' group, which represents the most common smoking habit among the population polled. This implies that a sizable percentage of the responders completely give up smoking. Subsequently, the '1-2 times' category reveals that a moderate proportion of people (155 respondents) report smoking cigarettes sometimes, probably occasionally. The 'sometimes' group represents a smaller subset of respondents (46 people) who consume cigarettes sometimes but not very often. The categories 'Regularly in Past' and 'Regularly Now' show declining counts as one moves towards more habitual smoking behaviors; that is, less and fewer people are smoking more often. Regularly in Past' reflects 20 respondents who used to smoke regularly but have since reduced or discontinued their smoking habit. Lastly, 'Regularly Now' represents the smallest count, with only 7 respondents reporting current regular smoking habits.
+
+```{r cigs}
+#TOBACCO/CIGS
+#scale of responses for cig questions in order from least to most
+scaleInOrderCig <- c('Never','1-2 times','Occasionally','Regurlarly in Past','Regularly Now')
+#create dataframe
+dfSmokeCig <- data.frame(scale = c('Never','1-2 times','Occasionally','Regurlarly in Past','Regularly Now'), count = summary(dfData_noNA$smokeCig))
+dfSmokeCig
+#bar graph to visualize distribution
+plotSmokeCig <- ggplot(data=dfSmokeCig, aes(x=factor(scale, scaleInOrderCig), y=count)) +
+  geom_bar(stat="identity") + labs(title = 'Frequency Respondent Smokes Cigarettes', x = "How Often Respondent Smokes Cigarettes", y = 'Count')
+plotSmokeCig
+```
+
+### Alcohol
+
+This component of our exploratory analysis focuses on alcohol consumption patterns for a broader understanding of substance use among 12th-grade students. We concentrate on the variable that represents the number of occasions a respondent drinks alcohol per year. We analyze the frequency of alcohol use using a histogram, resulting in a right-skewed graph that shows a significant peak in the ‘Occasionally’ category. This behavior suggests that a large number of the respondents reported only occasional consumption of alcohol. As the frequency of drinking increases to '1-2x', '3-5x', and beyond, there is a sharp decrease in the number of students reporting these higher frequencies, indicating that fewer students engage in more frequent alcohol consumption.
+
+Further, the continuous decrease in frequency in the histogram, as the drinking frequency increases to '6-9x', '10-19x', '20-39x', and '40+' times per year, signifies that regular and heavy drinking is considerably less common among the respondents.
+
+Our findings in this portion of our exploratory analysis highlight that while some level of occasional and social drinking occurs among high school seniors, heavy drinking is not particularly prevalent. Understanding these patterns is crucial for targeting the appropriate interventions and educational initiatives targeting this segment of adolescents who may be at higher risk for developing a reliance on alcohol use.
+
+```{r alcohol}
+summary(dfData_noNA$drinkYr)
+#scale of responses to alcohol question in order of least to most
+scaleInOrderAlc <- c('Occasionally','1-2x','3-5x','6-9x','10-19x','20-39x','40+')
+#create dataframe
+dfDrinkYr <- data.frame(scale = c('Occasionally','1-2x','3-5x','6-9x','10-19x','20-39x','40+'), count = summary(dfData_noNA$drinkYr))
+
+#bar graph to visualize distribution
+plotDrinkYr <- ggplot(data=dfDrinkYr, aes(x=factor(scale, scaleInOrderAlc), y=count)) +
+  geom_bar(stat="identity") + labs(title = 'Occasions Respondent Drinks Alcohol in Past Year', x = "How Often Respondent Drinks Alcohol in Past Year", y = 'Count')
+plotDrinkYr
+```
+
+Now looking among those who drink (excluding those who never drink), create a bar chart to see smoking frequency relationship to alcohol consumption frequency. By excluding those who never drink, it is easier to see the trends among those who do drink.
+
+```{r}
+df_filtered <- dfData_noNA %>%
+  filter(smokeCig != "(1) NEVER:(1)")  # Removing those who never smoke
+
+ggplot(df_filtered, aes(x=factor(drinkYr), fill=factor(smokeCig))) +
+  geom_bar(position=position_dodge(), color="black") +
+  labs(title="Smoking Behavior of Smokers Grouped by Alcohol Consumption Frequency",
+       x="Frequency of Alcohol Consumption",
+       y="Count of Responses",
+       fill="Smoking Frequency") +
+  theme_minimal()
+```
+
+## Analytical Deep Dive: Assessing the Influence of Family Background on Adolescent Substance Use
+
+Possible issues with the chi-square test include: Data may not meet test assumptions or may have expected values too small.
+
+### Father Presence and Alcohol Use
+
+To test the correlation between father presence and alcohol use, we conducted a Chi-Square Test between the variables ‘Father Presence’ and ‘Alcohol Use’ among the 12th-grade respondents. The results of the test yielded an X2 of 8.4203 with degrees of freedom six and a p-value of 0.2089. Given the p-value is greater than alpha level 0.05, there is no significant evidence to reject the null hypothesis that there is no relationship between father presence and alcohol use. In essence, there does not seem to be a statistically significant relationship between father presence and alcohol use among the students in this sample.
+
+The lack of statistically significant evidence in this portion of our exploratory analysis suggests that father presence, in the context of this dataset, is not strongly associated with how frequently the students consume alcohol. The fact that there is no significant association does not necessarily mean that there is no relationship at all between these two variables – our analysis might not detect the relationship because of the sample size or other confounding factors. Rather, these results introduce the possibility that other factors play a more substantial role in influencing alcohol use among the respondents.
+
+```{r correlations}
+#father presence on alcohol use
+dfFatherAlc <- data.frame(fatherPresent = dfData_noNA$fatherPresent , alcUse = dfData_noNA$drinkYr)
+#Contingency table
+table(dfFatherAlc)
+table(dfData_noNA$motherPresent, dfData_noNA$drinkYr)
+#father presence and alcohol use
+testFA <- chisq.test(table(dfFatherAlc)) #chi-sq test
+testFA
+#testFA$expected #expected values
+```
+
+### Mother Presence and Alcohol Use
+
+A similar chi-squared test is conducted to investigate any possible correlation between the two category variables, "Mother Presence" and "Alcohol Use". The first step in the analysis is to create a contingency table using the table() function. This tabulates the counts of observations depending on reported alcohol drinking behavior (drinkYr) and the presence of a mother in the household (motherPresent). The chi-squared test is conducted using this contingency table as its basis.
+
+The code produces many significant findings after using the chisq.test() method to do the chi-squared test. The statistical approach utilized for the analysis is detailed in the Pearson's Chi-squared test that is produced. There is a strong correlation between the two variables, as indicated by the chi-squared statistic (3.9131). Furthermore, the test indicates that there are six degrees of freedom (df). Lastly, 0.6884 is shown as the p-value for the chi-squared statistic.
+
+The chi-squared value of 3.9131, when interpreted in light of the data, sheds light on the strength of the relationship between "Mother Presence" and "Alcohol Use." Nevertheless, there is insufficient data to reject the null hypothesis, as indicated by the p-value of 0.6884, which is more than the standard significance level of 0.05. This implies that, according to the information at hand, there is no evidence of a significant correlation between the respondents' stated alcohol use behavior and the presence of a mother in the home. As a result, the study shows that, among the population questioned, having a mother does not seem to significantly affect patterns of alcohol use.
+
+```{r}
+#mother presence and alcohol use
+testMA <- chisq.test(table(dfData_noNA$motherPresent, dfData_noNA$drinkYr)) # chi-sq test
+testMA
+#testMA$expected
+```
+
+### Father Presence and Cigarette Use
+
+Our analysis further explores the influence of father presence by conducting a Chi-square test to examine the correlation between father presence and alcohol use and cigarette use among the respondents. The test showed an X2 of 11.591 with degrees of freedom of 4 and a p-value of 0.02066. The p-value indicates that there is a statistically significant relationship between father presence and cigarette use among the students in our sample. Since the p-value is less than alpha-level 0.05, we reject the null hypothesis of no association between father presence and cigarette use. We conclude that there is a relationship between these two variables in the given sample.
+
+Further, the statistically significant results stipulate that father presence might influence cigarette use among 12th-grade students. However, we note that we cannot determine using a Chi-Square test whether father presence contributes to lower or higher cigarette smoking rates, and further analysis is required.
+
+```{r}
+#father presence and cigarette use
+testFCig <- chisq.test(table(dfData_noNA$fatherPresent, dfData_noNA$smokeCig)) # chi-sq test
+testFCig
+#testFCig$expected
+```
+
+### Mother Presence and Cigarette Use
+
+A Pearson's chi-squared test is performed in the code section supplied to examine any possible correlation between the two category variables, "Mother Presence" and "Cigarette Use." As in the previous study, the procedure entails using the table() function to create a contingency table and tabulating the counts of observations depending on reported cigarette smoking habit (smokeCig) and the presence of a mother in the family (motherPresent).
+
+The code produces a number of significant outcomes when the chi-squared test is run using the chisq.test() method. The calculated value of the chi-squared statistic is 12.285.Furthermore, the test indicates that there are four degrees of freedom (df). Notably, a warning message is provided, suggesting that low predicted frequencies in some contingency table cells may mean that the chi-squared approximation is off.
+
+When interpreting the data, it is noted that the chi-squared statistic's p-value is 0.01536, which is less than the traditional significance level of 0.05. Consequently, there is enough data to rule out the null hypothesis, pointing to a substantial correlation between respondents' reported cigarette smoking habit and the presence of a mother in the home.
+
+It is essential to take note of the cautionary statement pertaining to the chi-squared approximation, as it suggests possible constraints on the precision of the test outcomes because of the low anticipated frequencies in some contingency table columns. To solve this problem and guarantee the accuracy of the results, more research could be necessary.
+
+```{r}
+#mother presence and cigarrete use
+testMCig <- chisq.test(table(dfData_noNA$motherPresent, dfData_noNA$smokeCig)) # chi-sq test
+testMCig
+#testMCig$expected
+```
+
+### Logistic Regression for Smoking
+
+First set up the data. Make presence binary with "0" for absent parent and "1" for present parent. Also, make education values easier to understand. Lastly, change the smoking variable to be binary "0" for never smoked and "1" for ever smoked.
+
+```{r}
+# Convert variables to factors
+dfData_noN_LRSmoking <- dfData_noNA %>%
+  mutate(
+    fatherPresent = factor(fatherPresent, levels = c("(0) NT MARKD:(0)", "(1) MARKED:(1)"), labels = c("No", "Yes")),
+    motherPresent = factor(motherPresent, levels = c("(0) NT MARKD:(0)", "(1) MARKED:(1)"), labels = c("No", "Yes")),
+    fatherEdu = factor(fatherEdu, levels = c("(1) GRDE SCH:(1)", "(2) SOME HS:(2)", "(3) HS GRAD:(3)", "(4) SOME CLG:(4)", "(5) CLG GRAD:(5)", "(6) GRAD SCH:(6)", "(7) DK:(7)"), #values
+                             labels = c("Grade School", "Some High School", "High School Graduate", 
+                                        "Some College", "College Graduate", "Graduate School", "Unknown")),
+    motherEdu = factor(motherEdu, levels = c("(1) GRDE SCH:(1)", "(2) SOME HS:(2)", "(3) HS GRAD:(3)", "(4) SOME CLG:(4)", "(5) CLG GRAD:(5)", "(6) GRAD SCH:(6)", "(7) DK:(7)"),
+                              labels = c("Grade School", "Some High School", "High School Graduate", 
+                                        "Some College", "College Graduate", "Graduate School", "Unknown")),
+    EverSmoked = factor(ifelse(smokeCig == "(1) NEVER:(1)", 0, 1), levels = c(0, 1), labels = c("Never Smoked", "Ever Smoked")),  # Recoding: Never to '0' (Never Smoked), others to '1' (Ever Smoked)
+  
+    DrinkingFrequency = factor(drinkYr)
+  )
+
+summary(dfData_noNA)
+
+```
+
+Now run a logistic regression to see how the variables affect smoking.
+
+```{r}
+# Logistic regression for smoking
+smoking_model <- glm(EverSmoked ~ fatherPresent + motherPresent + fatherEdu + motherEdu, 
+                     family = binomial(link = "logit"), data = dfData_noN_LRSmoking)
+summary(smoking_model)
+
+```
+
+The logistic regression model suggests that the most significant predictor of having ever smoked is the presence of a mother, with her presence being associated with lower odds of smoking. Father's presence and education levels of either parent, however, do not significantly affect smoking likelihood according to your model. This might suggest that mother's role or engagement could be more influential in the context of smoking behavior among the study population.
+
+Now, creating a coefficient plot to visualize the influence of each predictor. The bars show the magnitude of the coefficient shows how strong of an effect is on smoking. In addition, a positive value demonstrates an increasing log-odds (meaning a increasing probability) in smoking as the independent variable increases. On the other hand, a negative value demonstrates a decreasing log-odds (meaning a decreasing probability) in smoking as the independent variable increases.
+
+```{r}
+# Get a tidy dataframe of coefficients and confidence intervals
+smoke_model_coef <- tidy(smoking_model, conf.int = TRUE)
+
+smoke_model_coef <- smoke_model_coef %>%
+  mutate(
+    conf.low = estimate - 1.96 * std.error,
+    conf.high = estimate + 1.96 * std.error,
+    significance = ifelse(p.value < 0.05, "Significant", "Not Significant")
+  )
+
+ggplot(smoke_model_coef, aes(x = term, y = estimate, ymin = conf.low, ymax = conf.high, color = significance)) +
+  geom_pointrange() +  # Point range for estimates and their confidence intervals
+  scale_color_manual(values = c("Significant" = "red", "Not Significant" = "black")) +
+  coord_flip() +  # Flip coordinates to match the style
+  labs(
+    title = "Model Coefficients for Smoking Behavior",
+    x = "Predictors",
+    y = "Coefficient Estimate",
+    color = "Significance Level"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "top")
+```
+
+```{r}
+smoke_model_coef$odds_ratio <- exp(smoke_model_coef$estimate)
+
+ggplot(smoke_model_coef, aes(x = odds_ratio, y = term, color = p.value < 0.05)) +
+  geom_point() +
+  scale_x_log10() +
+  labs(x = "Odds Ratio", y = "Predictor", color = "Significant") +
+  theme_minimal()
+
+```
+
+### Ordinal Logistic Regression for Alcohol Use
+
+First set up the data through a similar process as was used for smoking.
+
+```{r}
+dfData_noNA_LRAlcohol <- dfData_noNA %>%
+  mutate(
+    fatherPresent = factor(fatherPresent, levels = c("(0) NT MARKD:(0)", "(1) MARKED:(1)"), labels = c("No", "Yes")),
+    motherPresent = factor(motherPresent, levels = c("(0) NT MARKD:(0)", "(1) MARKED:(1)"), labels = c("No", "Yes")),
+    fatherEdu = factor(fatherEdu, levels = c("(1) GRDE SCH:(1)", "(2) SOME HS:(2)", "(3) HS GRAD:(3)", "(4) SOME CLG:(4)", "(5) CLG GRAD:(5)", "(6) GRAD SCH:(6)", "(7) DK:(7)"),
+                      labels = c("Grade School", "Some High School", "High School Graduate", 
+                                 "Some College", "College Graduate", "Graduate School", "Unknown")),
+    motherEdu = factor(motherEdu, levels = c("(1) GRDE SCH:(1)", "(2) SOME HS:(2)", "(3) HS GRAD:(3)", "(4) SOME CLG:(4)", "(5) CLG GRAD:(5)", "(6) GRAD SCH:(6)", "(7) DK:(7)"),
+                       labels = c("Grade School", "Some High School", "High School Graduate", 
+                                  "Some College", "College Graduate", "Graduate School", "Unknown")),
+    DrinkingFrequency = factor(drinkYr, levels = c("(1) 0 OCCAS:(1)", "(2) 1-2X:(2)", "(3) 3-5X:(3)", "(4) 6-9X:(4)", "(5) 10-19X:(5)", "(6) 20-39X:(6)", "(7) 40+OCCAS:(7)"),
+                               labels = c("0", "1-2", "3-5", "6-9", "10-19","20-39"," 40+"),
+                               ordered = TRUE)
+  )
+summary(dfData_noNA_LRAlcohol)
+```
+
+Run the ordinal logistic regression
+
+```{r}
+alcohol_model <- polr(DrinkingFrequency ~ fatherPresent + motherPresent + fatherEdu + motherEdu, data = dfData_noNA_LRAlcohol)
+summary(alcohol_model)
+```
+
+Create a visualization to help see the model coefficients.
+
+```{r}
+# Extract and prepare model coefficients
+alc_model_coef <- tidy(alcohol_model) %>% 
+  filter(!grepl("^\\(", term)) %>%  # This regex matches terms that start with '(', typical of intercept descriptions
+  mutate(significance = ifelse(abs(statistic) >= 2, "Significant", "Not Significant"))
+
+# Plot Coefficients with Significance Highlighting
+ggplot(alc_model_coef, aes(x = term, y = estimate, ymin = estimate - std.error, ymax = estimate + std.error, color = significance)) +
+  geom_pointrange() +  # Use pointrange for estimates and their confidence intervals
+  scale_color_manual(values = c("Significant" = "red", "Not Significant" = "black")) +
+  coord_flip() +
+  labs(title = "Model Coefficients For Alcohol Use",
+       x = "Predictors",
+       y = "Coefficient Estimate",
+       color = "Significance Level") +
+  theme_minimal() +
+  theme(legend.position = "top")
+
+```
+
+Each point on the plot represents the estimated effect of each predictor variable on the log-odds of being in a higher category of alcohol use versus all lower categories combined. A positive coefficient indicates an increase in the log-odds of more frequent alcohol use with an increase in the predictor (or the presence of the predictor attribute), while a negative coefficient indicates a decrease.
+
+The lines extending from each point represent the confidence intervals for these estimates. If the interval does not cross zero, the effect is considered statistically significant at the chosen level (usually 95% confidence).
+
+Colors distinguish between statistically significant and non-significant results. Significance was based on the t-value and its corresponding degrees of freedom. Typically, t-values larger in absolute value than approximately 2 could be considered statistically significant at the 5% level, assuming a large sample size (degrees of freedom).
+
+Father Present (Yes): The coefficient is 0.2168 with a t-value of 1.8078. This suggests a slight positive association between having the father present and higher levels of alcohol use, although this effect is not statistically significant (since the t-value is less than 2). The positive coefficient indicates that when fathers are present, there's a slightly higher likelihood of moving up to a higher category of alcohol use.
+
+Mother Present (Yes): The coefficient is -0.2943 with a t-value of -1.7943. This indicates a negative association between having the mother present and alcohol use, suggesting that mother's presence might slightly reduce the likelihood of higher alcohol use. However, like the father's presence, this effect is not statistically significant.
+
+Father's Education: The coefficients vary by the level of education. For instance, "Some College" has a significant positive effect (coefficient = 0.7813, t-value = 2.6800), indicating a stronger association with higher alcohol use. The significance of this effect (as indicated by a t-value greater than 2) suggests that fathers with some college education might influence their children towards higher alcohol consumption compared to the baseline category.
+
+Mother's Education: Most categories show a negative association with alcohol use, with "Unknown" being significantly negative (coefficient = -1.2984, t-value = -3.5891).
+
+## Concluding Insights: Implications and Recommendations from Our Findings
+
+Our exploratory analysis sets the foundation for a deeper dive into parent-child relationship quality and behavioral patterns. The absence of a significant association between both mother and father's presence and alcohol use, contrasting with the significant relationship between their presence and cigarette use, suggests that parental influence manifests differently across substance use behaviors. The disjunction in our results prompts us to dig deeper into family dynamics and their role in shaping adolescent behavior.
+
+Some compelling questions particularly relevant for subsequent research include: How does the quality of the parent-child relationship influence substance use beyond just presence or absence? What is the interplay between parental presence and external factors such as peer influence in the nature of adolescent substance use? These questions help bridge the gaps from our initial findings and can offer more strategic insights into the multifaceted nature of substance use amongst 12th-graders. Focusing on these additional areas could provide a more in-depth understanding and amplify preventative measures within the educational system that are both effective and empathetic for students with substance abuse tendencies.
+
+## Works Cited
+
+Miech, Richard A., Johnston, Lloyd D., Bachman, Jerald G., O’Malley, Patrick M., Schulenberg, John E., and Patrick, Megan E. Monitoring the Future: A Continuing Study of American Youth (12th-Grade Survey), 2022. Inter-university Consortium for Political and Social Research [distributor], 2023-10-31. <https://doi.org/10.3886/ICPSR38882.v1>
